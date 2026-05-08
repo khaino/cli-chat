@@ -7,7 +7,7 @@ import { createFakeApiClient } from '../helpers/fakes.js';
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('<Login />', () => {
-  test('initial render shows the title and username prompt', () => {
+  test('initial render shows the brand and both fields', () => {
     const api = createFakeApiClient({});
     const onLogin = jest.fn();
     const onExit = jest.fn();
@@ -17,11 +17,13 @@ describe('<Login />', () => {
     );
 
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('CLI Chat - Login');
-    expect(frame).toContain('Enter username:');
+    expect(frame).toContain('cli-chat');
+    expect(frame).toContain('Sign in');
+    expect(frame).toContain('username');
+    expect(frame).toContain('password');
   });
 
-  test('typing a username appears in the rendered output', async () => {
+  test('typing into the username field appears in the rendered output', async () => {
     const api = createFakeApiClient({});
     const onLogin = jest.fn();
     const onExit = jest.fn();

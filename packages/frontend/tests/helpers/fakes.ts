@@ -37,6 +37,8 @@ export function createFakeApiClient(opts: FakeApiClientOptions = {}): ApiClient 
 export interface FakeSocketClient extends SocketClient {
   emitMessage(msg: MessageWithSender): void;
   emitPresence(payload: PresenceUpdatePayload): void;
+  emitTypingStart(userId: string): void;
+  emitTypingStop(userId: string): void;
   joins: string[];
   sentMessages: SendMessagePayload[];
   typingStarts: TypingPayload[];
@@ -47,6 +49,8 @@ export interface FakeSocketClient extends SocketClient {
 export function createFakeSocketClient(): FakeSocketClient {
   const messageListeners = new Set<(m: MessageWithSender) => void>();
   const presenceListeners = new Set<(p: PresenceUpdatePayload) => void>();
+  const typingStartListeners = new Set<(userId: string) => void>();
+  const typingStopListeners = new Set<(userId: string) => void>();
   const joins: string[] = [];
   const sentMessages: SendMessagePayload[] = [];
   const typingStarts: TypingPayload[] = [];
@@ -74,6 +78,14 @@ export function createFakeSocketClient(): FakeSocketClient {
       presenceListeners.add(cb);
       return () => presenceListeners.delete(cb);
     },
+    onTypingStart: (cb) => {
+      typingStartListeners.add(cb);
+      return () => typingStartListeners.delete(cb);
+    },
+    onTypingStop: (cb) => {
+      typingStopListeners.add(cb);
+      return () => typingStopListeners.delete(cb);
+    },
     disconnect: () => {
       disconnected = true;
     },
@@ -82,6 +94,12 @@ export function createFakeSocketClient(): FakeSocketClient {
     },
     emitPresence: (payload) => {
       for (const cb of presenceListeners) cb(payload);
+    },
+    emitTypingStart: (userId) => {
+      for (const cb of typingStartListeners) cb(userId);
+    },
+    emitTypingStop: (userId) => {
+      for (const cb of typingStopListeners) cb(userId);
     },
     get joins() {
       return joins;

@@ -4,6 +4,7 @@ import TextInput from 'ink-text-input';
 import type { SafeUser } from '@cli-chat/shared';
 import type { ApiClient, UsersFilter } from '../services/apiClient.js';
 import { parseCommand } from '../commands/parseCommand.js';
+import { capitalize } from './MessageList.js';
 
 interface MainScreenProps {
   api: ApiClient;
@@ -12,13 +13,21 @@ interface MainScreenProps {
   onExit: () => void;
 }
 
-const HELP_TEXT =
-  'Available commands:\n' +
-  '  /users           - List all users\n' +
-  '  /users -o        - List online users only\n' +
-  '  /user <username> - Start chat with user\n' +
-  '  /exit            - Exit the application\n' +
-  '  /help            - Show this help message';
+type Panel =
+  | { kind: 'welcome' }
+  | { kind: 'users'; filter: UsersFilter; users: SafeUser[] }
+  | { kind: 'help' }
+  | { kind: 'message'; text: string };
+
+const HELP_LINES: Array<[string, string]> = [
+  ['/users', 'list all users'],
+  ['/users -o', 'list online users only'],
+  ['/user <name>', 'start a chat'],
+  ['/help', 'this message'],
+  ['/exit', 'quit'],
+];
+
+const COMMAND_LABEL_WIDTH = 14;
 
 export function MainScreen({
   api,
@@ -27,28 +36,27 @@ export function MainScreen({
   onExit,
 }: MainScreenProps): JSX.Element {
   const [input, setInput] = useState('');
-  const [users, setUsers] = useState<SafeUser[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>({ kind: 'welcome' });
+  const [knownUsers, setKnownUsers] = useState<SafeUser[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setMessage(`Welcome, ${currentUser.username}! Type /help for available commands.`);
-  }, [currentUser.username]);
+    setPanel({ kind: 'welcome' });
+  }, [currentUser.id]);
 
   const fetchUsers = async (filter: UsersFilter): Promise<SafeUser[]> => {
     setLoading(true);
     try {
       const data = await api.getUsers(filter);
       if (data.success) {
-        setUsers(data.users);
-        const descriptor = filter === 'online' ? 'online users' : 'users';
-        setMessage(`Found ${data.users.length} ${descriptor}.`);
+        setKnownUsers(data.users);
+        setPanel({ kind: 'users', filter, users: data.users });
         return data.users;
       }
-      setMessage('Failed to fetch users.');
+      setPanel({ kind: 'message', text: 'Failed to fetch users.' });
       return [];
     } catch {
-      setMessage('Unable to connect to server.');
+      setPanel({ kind: 'message', text: 'Unable to connect to server.' });
       return [];
     } finally {
       setLoading(false);
@@ -59,17 +67,17 @@ export function MainScreen({
     list.find((u) => u.username.toLowerCase() === username.toLowerCase());
 
   const handleStartChat = async (username: string) => {
-    let target = findUser(username, users);
+    let target = findUser(username, knownUsers);
     if (!target) {
       const fresh = await fetchUsers('all');
       target = findUser(username, fresh);
     }
     if (!target) {
-      setMessage(`User '${username}' not found.`);
+      setPanel({ kind: 'message', text: `User '${username}' not found.` });
       return;
     }
     if (target.id === currentUser.id) {
-      setMessage('You cannot start a chat with yourself.');
+      setPanel({ kind: 'message', text: 'You cannot start a chat with yourself.' });
       return;
     }
     onStartChat(target);
@@ -86,67 +94,114 @@ export function MainScreen({
         await handleStartChat(cmd.username);
         return;
       case 'help':
-        setMessage(HELP_TEXT);
+        setPanel({ kind: 'help' });
         return;
       case 'exit':
         onExit();
         return;
       case 'unknown':
-        setMessage(`Unknown command: ${cmd.raw}. Type /help for available commands.`);
+        setPanel({
+          kind: 'message',
+          text: `Unknown command: ${cmd.raw}. Type /help for available commands.`,
+        });
         return;
-      case 'message':
-      case 'noop':
-      case 'back':
       default:
-        setMessage('Type a command starting with /. Type /help for available commands.');
-        return;
+        setPanel({
+          kind: 'message',
+          text: 'Type a command starting with /. Type /help for commands.',
+        });
     }
   };
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="green">
-          ✓ Logged in as: {currentUser.username}
-        </Text>
+        <Text bold color="cyan">cli-chat</Text>
+        <Text dimColor>{'  ·  '}</Text>
+        <Text bold>{capitalize(currentUser.username)}</Text>
       </Box>
 
-      {message && (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text dimColor>{message}</Text>
-        </Box>
-      )}
-
-      {users.length > 0 && (
-        <Box flexDirection="column" marginBottom={1}>
-          <Text bold underline>Users:</Text>
-          {users.map((user) => (
-            <Box key={user.id} marginLeft={2}>
-              <Text>
-                {`• ${user.username}`}
-                {user.online === true && <Text color="green"> ●</Text>}
-                {user.online === false && <Text color="gray"> ●</Text>}
-                {user.id === currentUser.id && <Text dimColor> (you)</Text>}
-              </Text>
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {loading && (
-        <Box marginBottom={1}>
-          <Text dimColor>Loading...</Text>
-        </Box>
-      )}
+      <PanelView panel={panel} currentUserId={currentUser.id} loading={loading} />
 
       <Box marginTop={1}>
-        <Text color="cyan">{'> '}</Text>
+        <Text color="cyan">{'› '}</Text>
         <TextInput
           value={input}
           onChange={setInput}
           onSubmit={handleSubmit}
-          placeholder="Type a command..."
+          placeholder="Type a command, e.g. /users"
         />
+      </Box>
+    </Box>
+  );
+}
+
+interface PanelViewProps {
+  panel: Panel;
+  currentUserId: string;
+  loading: boolean;
+}
+
+function PanelView({ panel, currentUserId, loading }: PanelViewProps): JSX.Element {
+  if (loading) {
+    return (
+      <Box marginBottom={1}>
+        <Text dimColor>loading…</Text>
+      </Box>
+    );
+  }
+
+  if (panel.kind === 'welcome') {
+    return (
+      <Box flexDirection="column" marginBottom={1}>
+        <Text>Welcome.</Text>
+        <Box marginTop={1}>
+          <Text dimColor>Type /help for commands.</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (panel.kind === 'message') {
+    return (
+      <Box marginBottom={1}>
+        <Text dimColor>{panel.text}</Text>
+      </Box>
+    );
+  }
+
+  if (panel.kind === 'help') {
+    return (
+      <Box flexDirection="column" marginBottom={1}>
+        <Text bold>Commands</Text>
+        <Box flexDirection="column" marginTop={1}>
+          {HELP_LINES.map(([cmd, desc]) => (
+            <Box key={cmd}>
+              <Box width={COMMAND_LABEL_WIDTH}>
+                <Text>{cmd}</Text>
+              </Box>
+              <Text dimColor>{desc}</Text>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  const heading = panel.filter === 'online' ? 'Online' : 'Users';
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text bold>{`${heading} · ${panel.users.length}`}</Text>
+      <Box flexDirection="column" marginTop={1}>
+        {panel.users.map((user) => (
+          <Box key={user.id}>
+            <Text color={user.online ? 'green' : 'gray'}>
+              {user.online ? '●' : '○'}
+            </Text>
+            <Text>{` ${capitalize(user.username)}`}</Text>
+            {user.id === currentUserId && <Text dimColor>{'  (you)'}</Text>}
+          </Box>
+        ))}
       </Box>
     </Box>
   );

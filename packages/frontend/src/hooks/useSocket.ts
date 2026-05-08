@@ -21,9 +21,19 @@ export function useSocketSubscriptions(
       });
     });
 
+    const offTypingStart = socket.onTypingStart((userId) => {
+      dispatch({ type: 'typing-started', userId });
+    });
+
+    const offTypingStop = socket.onTypingStop((userId) => {
+      dispatch({ type: 'typing-stopped', userId });
+    });
+
     return () => {
       offMessage();
       offPresence();
+      offTypingStart();
+      offTypingStop();
     };
   }, [socket, dispatch]);
 }

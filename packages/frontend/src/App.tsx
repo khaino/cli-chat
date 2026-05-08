@@ -52,6 +52,7 @@ export function App({ api, socket, onExit }: AppProps): JSX.Element {
           currentUser={state.user}
           chatPartner={state.partner}
           messages={state.messages}
+          typingUserIds={state.typingUserIds}
           onBack={() => dispatch({ type: 'back-to-main' })}
           onSendMessage={sendMessage}
         />

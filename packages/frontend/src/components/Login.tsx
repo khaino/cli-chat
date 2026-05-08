@@ -10,125 +10,92 @@ interface LoginProps {
   onExit: () => void;
 }
 
-type Step = 'username' | 'password' | 'retry';
+type Field = 'username' | 'password';
 
-export function Login({ api, onLogin, onExit }: LoginProps): JSX.Element {
-  const [step, setStep] = useState<Step>('username');
+export function Login({ api, onLogin }: LoginProps): JSX.Element {
+  const [field, setField] = useState<Field>('username');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [retryInput, setRetryInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleUsernameSubmit = () => {
-    if (username.trim()) setStep('password');
-  };
-
-  const handlePasswordSubmit = async () => {
-    if (!password.trim()) return;
-    setLoading(true);
+  const submit = async () => {
+    if (!username.trim() || !password) return;
+    setSubmitting(true);
     setError(null);
     try {
-      const data = await api.login(username.trim(), password.trim());
+      const data = await api.login(username.trim(), password);
       if (data.success) {
         onLogin(data.user);
-      } else {
-        setError(data.error || 'Login failed');
-        setStep('retry');
+        return;
       }
+      setError(data.error || 'Login failed.');
+      setPassword('');
+      setField('password');
     } catch {
-      setError('Unable to connect to server. Make sure the server is running.');
-      setStep('retry');
+      setError('Unable to connect to server. Make sure it is running.');
+      setPassword('');
+      setField('password');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleRetryChoice = (choice: string) => {
-    const trimmed = choice.trim().toLowerCase();
-    if (trimmed === 'exit' || trimmed === 'e') {
-      onExit();
-      return;
-    }
-    setUsername('');
-    setPassword('');
-    setRetryInput('');
-    setError(null);
-    setStep('username');
+  const handleUsernameSubmit = () => {
+    if (!username.trim()) return;
+    setField('password');
   };
-
-  if (loading) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text color="cyan">Logging in...</Text>
-      </Box>
-    );
-  }
-
-  if (step === 'retry') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Box marginBottom={1}>
-          <Text color="red">{`✗ ${error ?? ''}`}</Text>
-        </Box>
-        <Text dimColor>Press Enter to try again, or type 'exit' to quit:</Text>
-        <TextInput
-          value={retryInput}
-          onChange={setRetryInput}
-          placeholder="Press Enter to retry or type 'exit'"
-          onSubmit={handleRetryChoice}
-        />
-      </Box>
-    );
-  }
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">╔══════════════════════════════╗</Text>
-      </Box>
-      <Box marginBottom={1}>
-        <Text bold color="cyan">║      CLI Chat - Login        ║</Text>
-      </Box>
-      <Box marginBottom={1}>
-        <Text bold color="cyan">╚══════════════════════════════╝</Text>
+        <Text bold color="cyan">cli-chat</Text>
       </Box>
 
-      {error && (
-        <Box marginBottom={1}>
-          <Text color="red">{error}</Text>
-        </Box>
-      )}
+      <Box marginBottom={1}>
+        <Text>Sign in</Text>
+      </Box>
 
-      {step === 'username' && (
-        <Box flexDirection="column">
-          <Text>Enter username:</Text>
+      <Box>
+        <Text dimColor>username  </Text>
+        {field === 'username' ? (
           <TextInput
             value={username}
             onChange={setUsername}
             onSubmit={handleUsernameSubmit}
-            placeholder="Username"
           />
-        </Box>
-      )}
+        ) : (
+          <Text>{username}</Text>
+        )}
+      </Box>
 
-      {step === 'password' && (
-        <Box flexDirection="column">
-          <Text>
-            Username: <Text color="green">{username}</Text>
-          </Text>
-          <Box marginTop={1}>
-            <Text>Enter password:</Text>
-          </Box>
+      <Box>
+        <Text dimColor>password  </Text>
+        {field === 'password' && !submitting ? (
           <TextInput
             value={password}
             onChange={setPassword}
-            onSubmit={handlePasswordSubmit}
-            placeholder="Password"
-            mask="*"
+            onSubmit={submit}
+            mask="•"
           />
+        ) : (
+          <Text>{password.replace(/./g, '•')}</Text>
+        )}
+      </Box>
+
+      {error && (
+        <Box marginTop={1}>
+          <Text color="red">{error}</Text>
         </Box>
       )}
+
+      <Box marginTop={1}>
+        <Text dimColor>
+          {submitting
+            ? 'signing in…'
+            : 'enter to continue · ctrl+c to quit'}
+        </Text>
+      </Box>
     </Box>
   );
 }

@@ -18,6 +18,8 @@ export interface SocketClient {
   stopTyping(payload: TypingPayload): void;
   onMessage(cb: (msg: MessageWithSender) => void): () => void;
   onPresence(cb: (payload: PresenceUpdatePayload) => void): () => void;
+  onTypingStart(cb: (userId: string) => void): () => void;
+  onTypingStop(cb: (userId: string) => void): () => void;
   disconnect(): void;
 }
 
@@ -38,6 +40,18 @@ export function createSocketClient(url: string): SocketClient {
     onPresence: (cb) => {
       socket.on(SocketEvents.PresenceUpdate, cb);
       return () => socket.off(SocketEvents.PresenceUpdate, cb);
+    },
+
+    onTypingStart: (cb) => {
+      const handler = (payload: { userId: string }) => cb(payload.userId);
+      socket.on(SocketEvents.TypingIndicator, handler);
+      return () => socket.off(SocketEvents.TypingIndicator, handler);
+    },
+
+    onTypingStop: (cb) => {
+      const handler = (payload: { userId: string }) => cb(payload.userId);
+      socket.on(SocketEvents.TypingStopped, handler);
+      return () => socket.off(SocketEvents.TypingStopped, handler);
     },
 
     disconnect: () => socket.disconnect(),
