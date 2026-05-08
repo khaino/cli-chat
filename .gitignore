@@ -1,6 +1,11 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
 *.db
 *.db-journal
 .env
+.specstory/
+.vscode/
+.cursorindexingignore
+.cursor/

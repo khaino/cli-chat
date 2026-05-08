@@ -1,33 +1,15 @@
+/** @type {import('jest').Config} */
 export default {
-  preset: 'ts-jest/presets/default-esm',
-  testEnvironment: 'node',
-  roots: ['<rootDir>/tests'],
-  testMatch: ['**/*.test.ts'],
-  moduleFileExtensions: ['ts', 'js', 'json'],
+  projects: [
+    '<rootDir>/packages/backend',
+    '<rootDir>/packages/frontend'
+  ],
   collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/tui/index.tsx',
-    '!src/server/index.ts'
+    'packages/*/src/**/*.{ts,tsx}',
+    '!packages/*/src/**/*.d.ts',
+    '!packages/backend/src/index.ts',
+    '!packages/frontend/src/index.tsx'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true,
-      tsconfig: {
-        module: 'ESNext',
-        moduleResolution: 'node',
-        target: 'ES2020',
-        strict: true,
-        esModuleInterop: true,
-        skipLibCheck: true,
-        jsx: 'react-jsx'
-      }
-    }]
-  },
-  extensionsToTreatAsEsm: ['.ts'],
-  moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
-  }
+  coverageReporters: ['text', 'lcov', 'html']
 };

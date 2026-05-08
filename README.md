@@ -1,221 +1,163 @@
 # CLI Chat
 
-A real-time CLI chat application with a Text User Interface (TUI) built using Ink (React for CLI).
+A real-time CLI chat application with a Text User Interface (TUI), structured as an npm-workspaces monorepo.
 
 ## Tech Stack
 
 - **Database**: SQLite (better-sqlite3)
-- **Backend**: Node.js with Express
-- **Real-time Communication**: Socket.IO
+- **Backend**: Node.js with Express + Socket.IO
 - **TUI Framework**: Ink (React for CLI)
+- **Validation**: Zod
 - **Language**: TypeScript
 
-## Project Structure
+## Repository layout
 
 ```
 cli-chat/
-├── src/
-│   ├── database/           # Database layer
-│   │   ├── index.ts        # Database operations
-│   │   └── schema.ts       # SQL schema definitions
-│   ├── server/             # Express server
-│   │   └── index.ts        # API endpoints & Socket.IO handlers
-│   ├── tui/                # Terminal User Interface
-│   │   ├── components/     # Ink components
-│   │   │   ├── Login.tsx   # Login screen
-│   │   │   ├── MainScreen.tsx  # Main chat interface
-│   │   │   └── ChatScreen.tsx  # Chat conversation view
-│   │   ├── api.ts          # API client functions
-│   │   └── index.tsx       # App entry point
-│   ├── types/              # TypeScript type definitions
-│   │   └── index.ts
-│   └── utils/              # Utility functions
-│       └── password.ts     # Password hashing utilities
-├── tests/                  # Unit tests
-│   ├── database.test.ts
-│   ├── password.test.ts
-│   └── api.test.ts
-├── package.json
-├── tsconfig.json
-├── jest.config.js
+├── package.json                  # workspace root
+├── tsconfig.base.json            # shared TS settings
+├── jest.config.js                # multi-project Jest config
+├── packages/
+│   ├── shared/                   # @cli-chat/shared (types, socket contracts, zod schemas)
+│   ├── backend/                  # @cli-chat/backend (Express + Socket.IO + SQLite)
+│   └── frontend/                 # @cli-chat/frontend (Ink TUI)
 └── README.md
 ```
 
-## Database Schema
+Dependency direction: `frontend ──▶ shared ◀── backend`. The frontend and backend never import from each other.
 
-### Users Table
-| Column | Type | Description |
-|--------|------|-------------|
-| id | TEXT (UUID) | Primary key |
-| username | TEXT | Unique username |
-| password | TEXT | Bcrypt hashed password |
-| created_at | TEXT | Creation timestamp |
-| updated_at | TEXT | Last update timestamp |
+### `shared/`
+- Domain types (`SafeUser`, `Chat`, `Message`, `MessageWithSender`)
+- HTTP request/response DTOs
+- Socket.IO event names + typed contracts (`ClientToServerEvents`, `ServerToClientEvents`)
+- Zod schemas for HTTP and socket payload validation
+- API path constants
 
-### Chats Table
-| Column | Type | Description |
-|--------|------|-------------|
-| id | TEXT (UUID) | Primary key |
-| created_at | TEXT | Creation timestamp |
+### `backend/`
+Layered: `config → database (connection + repositories) → services (Auth, Chat, Presence) → server (createServer + routes + sockets) → entrypoint`. Routes are thin and call services; services are constructed with explicit dependencies, so tests can swap in an in-memory SQLite DB.
 
-### ChatParticipants Table
-| Column | Type | Description |
-|--------|------|-------------|
-| id | TEXT (UUID) | Primary key |
-| chat_id | TEXT | Foreign key to chats |
-| user_id | TEXT | Foreign key to users |
-| created_at | TEXT | Creation timestamp |
-
-### Messages Table
-| Column | Type | Description |
-|--------|------|-------------|
-| id | TEXT (UUID) | Primary key |
-| chat_id | TEXT | Foreign key to chats |
-| content | TEXT | Message content |
-| sender_id | TEXT | Foreign key to users |
-| created_at | TEXT | Creation timestamp |
-
-## API Design
-
-### Authentication
-
-#### POST /api/login
-Login with username and password.
-
-**Request Body:**
-```json
-{
-  "username": "alice",
-  "password": "password123"
-}
-```
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "user": {
-    "id": "user-001",
-    "username": "alice",
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "updated_at": "2024-01-01T00:00:00.000Z"
-  }
-}
-```
-
-**Error Response:**
-```json
-{
-  "success": false,
-  "error": "Invalid username or password"
-}
-```
-
-### Users
-
-#### GET /api/users
-Get all registered users.
-
-**Response:**
-```json
-{
-  "success": true,
-  "users": [
-    {
-      "id": "user-001",
-      "username": "alice",
-      "created_at": "2024-01-01T00:00:00.000Z",
-      "updated_at": "2024-01-01T00:00:00.000Z"
-    }
-  ]
-}
-```
-
-### Chats
-
-#### POST /api/chat/start
-Start or retrieve a chat with another user.
-
-**Request Body:**
-```json
-{
-  "currentUserId": "user-001",
-  "targetUserId": "user-002"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "chat": {
-    "id": "chat-001",
-    "created_at": "2024-01-01T00:00:00.000Z"
-  },
-  "participants": [...],
-  "messages": [...]
-}
-```
-
-#### GET /api/chat/:chatId/messages
-Get all messages for a chat.
-
-### Socket.IO Events
-
-#### Client → Server
-- `user:join` - Join with user ID
-- `message:send` - Send a message
-- `typing:start` - Start typing indicator
-- `typing:stop` - Stop typing indicator
-
-#### Server → Client
-- `message:receive` - Receive a new message
-- `typing:indicator` - Other user is typing
-- `typing:stopped` - Other user stopped typing
+### `frontend/`
+Pure presentational components driven by an `appReducer` and an `ApiClient` / `SocketClient` interface. Components never call `fetch` or talk to sockets directly; everything goes through the injected services so tests can pass in fakes.
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd cli-chat
-
-# Install dependencies
 npm install
-
-# Build the project
-npm run build
 ```
 
-## Running the Application
+This installs all workspaces and links them together.
 
-### Start the Server
+## Running
+
+The backend (Express + Socket.IO) and the TUI (Ink fullscreen) need their own terminals.
+
+### Development (fast: tsx, no compile step)
+
 ```bash
-npm run start:server
-```
-The server will start on port 3000 by default.
+# Terminal 1 — backend on :3000
+#   On the first run with an empty DB, you'll be prompted:
+#   "Seed 5 dummy users into 'cli-chat.db'? [y/N]"
+#   Default is N. Hit y to seed demo users; otherwise the server just starts.
+npm run server:dev
 
-### Start the TUI Client
+# Wipe the SQLite DB and start fresh (re-prompts for seeding):
+npm run server:dev --clear
+
+# Terminal 2 — TUI client
+npm run tui:dev
+```
+
+### Database utilities
+
 ```bash
-npm run start:tui
+# Seed 5 dummy users (prompts Y/N, default N)
+npm run db:seed
+
+# Seed without prompting (CI / scripts)
+npm run db:seed -w @cli-chat/backend -- --yes
+
+# Wipe the dev SQLite DB without starting the server
+npm run db:clear
 ```
-Or, if installed globally:
+
+### Production (compiled JS via node)
+
 ```bash
-cli-chat
+# Terminal 1
+npm run server:start
+
+# Terminal 2
+npm run tui:start
 ```
 
-### Development Mode
+Both `:dev` and `:start` modes run the same code; `:dev` skips the frontend/backend compile step using `tsx`. See the table in this README for differences.
+
+## Building
+
 ```bash
-# Run TUI in development mode
-npm run dev
+npm run build         # builds shared, backend, frontend in dependency order
+npm run typecheck     # type-checks every package
 ```
 
-## Dummy User Credentials
+## Testing
 
-The application comes pre-seeded with five dummy users for testing:
+```bash
+npm test              # runs all unit + integration tests across all packages
+npm run test:coverage # with coverage report
+```
+
+Tests are organized as:
+- `packages/*/tests/unit/` — pure unit tests (services, reducers, parsers, repositories on `:memory:` SQLite)
+- `packages/*/tests/integration/` — Express via `supertest`, real Socket.IO over an ephemeral port, Ink components via `ink-testing-library`
+
+## Configuration
+
+All configuration is read from environment variables. See `.env.example` for the full list. Important ones:
+
+| Variable | Default | Used by |
+|---|---|---|
+| `PORT` | `3000` | backend |
+| `DB_PATH` | `cli-chat.db` | backend |
+| `SALT_ROUNDS` | `10` | backend |
+| `SEED_PASSWORD` | `password123` | backend (used only by `npm run db:seed`) |
+| `LOG_LEVEL` | `info` | backend |
+| `CORS_ORIGIN` | `*` | backend |
+| `CLI_CHAT_API_URL` | `http://localhost:3000` | frontend |
+| `CLI_CHAT_SOCKET_URL` | (falls back to API URL) | frontend |
+
+## Dummy users
+
+The backend itself never seeds. Seeding is a separate developer tool:
+
+- `npm run server:dev` chains `npm run db:seed` before starting the server.
+- `db:seed` checks the `users` table:
+  - **If non-empty** → silently skips (no prompt, no work).
+  - **If empty** → asks `Seed 5 dummy users into 'cli-chat.db'? [y/N]`. Default is **N**.
+- Hit Enter (or `n`) to skip; type `y` to seed.
+- Pass `--yes` for non-interactive scripts: `npm run db:seed -- --yes`.
+- In non-TTY environments (CI), the prompt is suppressed and the default (skip) applies.
+
+So your daily flow is:
+
+```bash
+npm run server:dev          # silent on subsequent restarts
+npm run server:dev --clear  # wipes DB; will re-prompt for seeding
+```
+
+In production (`npm run server:start`) seeding is impossible — there's no code path that calls `seedDummyUsers`.
+
+| User | Password |
+|---|---|
+| alice | password123 |
+| bob | password123 |
+| charlie | password123 |
+| diana | password123 |
+| edward | password123 |
+
+The password is configurable via `SEED_PASSWORD`.
 
 | Username | Password |
-|----------|----------|
+|---|---|
 | alice | password123 |
 | bob | password123 |
 | charlie | password123 |
@@ -224,64 +166,22 @@ The application comes pre-seeded with five dummy users for testing:
 
 ## TUI Commands
 
-Once logged in, the following commands are available:
+In the main screen:
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `/users` | List all registered users |
+| `/users -o` (or `--online`) | List online users only |
 | `/user <username>` | Start a chat with the specified user |
 | `/help` | Show available commands |
 | `/exit` | Exit the application |
 
 In a chat:
+
 | Command | Description |
-|---------|-------------|
-| `/back` | Return to main screen |
-| Type message | Send a message |
-
-## Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-```
-
-## Architecture
-
-### Authentication Flow
-
-1. User runs `cli-chat` command
-2. TUI displays login screen asking for username/password
-3. Credentials are sent to `/api/login` endpoint
-4. On success, user is taken to main screen
-5. On failure, error is shown with options to retry or exit
-
-### Real-time Messaging
-
-1. When a user starts a chat via `/user <username>`, a Socket.IO connection is established
-2. The user joins their personal room (`user:<userId>`)
-3. Messages are sent via `message:send` event
-4. Messages are received via `message:receive` event
-5. All messages are persisted in SQLite database
-
-## Development
-
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-
-### Building
-```bash
-npm run build
-```
-
-### Type Checking
-```bash
-npx tsc --noEmit
-```
+|---|---|
+| `/back` (or `/exit`) | Return to main screen |
+| Anything else | Sent as a chat message |
 
 ## License
 
