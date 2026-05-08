@@ -125,7 +125,26 @@ All configuration is read from environment variables. See `.env.example` for the
 | `CLI_CHAT_API_URL` | `http://localhost:3000` | frontend |
 | `CLI_CHAT_SOCKET_URL` | (falls back to API URL) | frontend |
 
-## Dummy users
+## TUI Commands
+
+In the main screen:
+
+| Command | Description |
+|---|---|
+| `/users` | List all registered users |
+| `/users -o` (or `--online`) | List online users only |
+| `/user <username>` | Start a chat with the specified user |
+| `/help` | Show available commands |
+| `/exit` | Exit the application |
+
+In a chat:
+
+| Command | Description |
+|---|---|
+| `/back` (or `/exit`) | Return to main screen |
+| Anything else | Sent as a chat message |
+
+## Dummy users for development
 
 The backend itself never seeds. Seeding is a separate developer tool:
 
@@ -146,15 +165,7 @@ npm run server:dev --clear  # wipes DB; will re-prompt for seeding
 
 In production (`npm run server:start`) seeding is impossible — there's no code path that calls `seedDummyUsers`.
 
-| User | Password |
-|---|---|
-| alice | password123 |
-| bob | password123 |
-| charlie | password123 |
-| diana | password123 |
-| edward | password123 |
-
-The password is configurable via `SEED_PASSWORD`.
+When seeded, the following users are created (password configurable via `SEED_PASSWORD`):
 
 | Username | Password |
 |---|---|
@@ -163,26 +174,3 @@ The password is configurable via `SEED_PASSWORD`.
 | charlie | password123 |
 | diana | password123 |
 | edward | password123 |
-
-## TUI Commands
-
-In the main screen:
-
-| Command | Description |
-|---|---|
-| `/users` | List all registered users |
-| `/users -o` (or `--online`) | List online users only |
-| `/user <username>` | Start a chat with the specified user |
-| `/help` | Show available commands |
-| `/exit` | Exit the application |
-
-In a chat:
-
-| Command | Description |
-|---|---|
-| `/back` (or `/exit`) | Return to main screen |
-| Anything else | Sent as a chat message |
-
-## License
-
-MIT
